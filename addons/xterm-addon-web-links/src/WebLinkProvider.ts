@@ -3,25 +3,26 @@
  * @license MIT
  */
 
-import { ILinkProvider, IBufferCellPosition, ILink, Terminal } from 'xterm';
+import { ILinkProvider, IBufferCellPosition, ILink, Terminal, ILinkMatcherOptions, IViewportRange } from 'xterm';
 
 export class WebLinkProvider implements ILinkProvider {
 
   constructor(
     private readonly _terminal: Terminal,
     private readonly _regex: RegExp,
-    private readonly _handler: (event: MouseEvent, uri: string) => void
+    private readonly _handler: (event: MouseEvent, uri: string) => void,
+    private readonly _options: ILinkMatcherOptions
   ) {
 
   }
 
   public provideLinks(y: number, callback: (links: ILink[] | undefined) => void): void {
-    callback(LinkComputer.computeLink(y, this._regex, this._terminal, this._handler));
+    callback(LinkComputer.computeLink(y, this._regex, this._terminal, this._handler, this._options.tooltipCallback, this._options.leaveCallback));
   }
 }
 
 export class LinkComputer {
-  public static computeLink(y: number, regex: RegExp, terminal: Terminal, handler: (event: MouseEvent, uri: string) => void): ILink[] {
+  public static computeLink(y: number, regex: RegExp, terminal: Terminal, handler: (event: MouseEvent, uri: string) => void, hover?: (event: MouseEvent, uri: string, location: IViewportRange) => void, leave?: (event: MouseEvent, uri: string) => void): ILink[] {
     const rex = new RegExp(regex.source, (regex.flags || '') + 'g');
 
     const [line, startLineIndex] = LinkComputer._translateBufferLineToStringWithWrap(y - 1, false, terminal);
@@ -69,7 +70,12 @@ export class LinkComputer {
         }
       };
 
-      result.push({ range, text, activate: handler });
+      const hoverCallback = (event: MouseEvent, uri: string) => {
+        if (!hover) return;
+        hover(event, uri, range);
+      };
+
+      result.push({ range, text, activate: handler, hover: hoverCallback, leave: leave });
     }
 
     return result;
